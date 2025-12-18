@@ -118,7 +118,7 @@ BEGIN
         RETURN; -- no impact on quantity
     END IF;
 
-    SP_UPDATE_NEED_QTY(
+    SECURITY_PKG.SP_UPDATE_NEED_QTY(
         p_besoin_id => :NEW.id_besoin,
         p_delta     => v_delta,
         p_status    => v_status,
