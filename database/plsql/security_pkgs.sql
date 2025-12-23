@@ -208,6 +208,23 @@ CREATE OR REPLACE PACKAGE BODY SECURITY_PKG AS
     -- ============================================================
     -- PROCEDURE: SP_LOGIN
     -- ============================================================
+    
+    PROCEDURE set_app_user(
+        p_user_id IN Utilisateur.id_user%TYPE,
+        p_email   IN VARCHAR2
+    ) IS
+    BEGIN
+        DBMS_SESSION.SET_CONTEXT('APP_CTX', 'USER_ID', p_user_id);
+        DBMS_SESSION.SET_CONTEXT('APP_CTX', 'USER_EMAIL', p_email);
+    END;
+    
+    
+    PROCEDURE clear_app_user IS
+    BEGIN
+        DBMS_SESSION.CLEAR_CONTEXT('APP_CTX');
+    END;
+    
+    
     PROCEDURE SP_LOGIN (
         p_email      IN  VARCHAR2,
         p_password   IN  VARCHAR2,
@@ -216,19 +233,20 @@ CREATE OR REPLACE PACKAGE BODY SECURITY_PKG AS
         p_status     OUT VARCHAR2,
         p_message    OUT VARCHAR2
     ) AS
-        v_password   Utilisateur.password_hash%TYPE;
-        v_statut     Utilisateur.statut_user%TYPE;
-        v_err_code   VARCHAR2(50);
-        v_err_msg    VARCHAR2(500);
+        v_password_hash Utilisateur.password_hash%TYPE;
+        v_input_hash    VARCHAR2(64);
+        v_statut        Utilisateur.statut_user%TYPE;
+        v_err_code      VARCHAR2(50);
+        v_err_msg       VARCHAR2(500);
     BEGIN
         p_id_user   := NULL;
         p_main_role := NULL;
         p_status    := 'ERROR';
         p_message   := 'UNKNOWN_ERROR';
     
-        -- Find user
+        -- Get user
         SELECT id_user, password_hash, statut_user
-        INTO p_id_user, v_password, v_statut
+        INTO p_id_user, v_password_hash, v_statut
         FROM Utilisateur
         WHERE LOWER(email_user) = LOWER(p_email);
     
@@ -240,8 +258,13 @@ CREATE OR REPLACE PACKAGE BODY SECURITY_PKG AS
             RETURN;
         END IF;
     
-        -- Simple password check (later, use hash)
-        IF v_password <> p_password THEN
+        -- Hash input password
+        SELECT STANDARD_HASH(p_password, 'SHA256')
+        INTO   v_input_hash
+        FROM   dual;
+    
+        -- Compare hashes
+        IF v_password_hash <> v_input_hash THEN
             p_status  := 'INVALID_CREDENTIALS';
             p_message := 'Invalid email or password.';
             p_id_user := NULL;
@@ -251,6 +274,9 @@ CREATE OR REPLACE PACKAGE BODY SECURITY_PKG AS
         -- Get main role
         p_main_role := SECURITY_PKG.get_main_role(p_id_user);
     
+        -- ✅ Set DB session context
+        SECURITY_PKG.set_app_user(p_id_user, p_email);
+    
         p_status  := 'OK';
         p_message := 'Login successful.';
     EXCEPTION
@@ -259,16 +285,13 @@ CREATE OR REPLACE PACKAGE BODY SECURITY_PKG AS
             p_main_role := NULL;
             p_status    := 'INVALID_CREDENTIALS';
             p_message   := 'Invalid email or password.';
+    
         WHEN OTHERS THEN
             v_err_code := TO_CHAR(SQLCODE);
             v_err_msg  := SUBSTR(SQLERRM, 1, 500);
     
             INSERT INTO Error_Log (
-                error_code,
-                error_message,
-                source_procedure,
-                error_date,
-                details
+                error_code, error_message, source_procedure, error_date, details
             ) VALUES (
                 v_err_code,
                 v_err_msg,
@@ -283,6 +306,25 @@ CREATE OR REPLACE PACKAGE BODY SECURITY_PKG AS
             p_message   := 'Unexpected error: ' || v_err_msg;
     END SP_LOGIN;
     
+    -- ============================================================
+    -- PROCEDURE: SP_LOGOUT
+    -- ============================================================
+
+    PROCEDURE SP_LOGOUT (
+        p_status  OUT VARCHAR2,
+        p_message OUT VARCHAR2
+    ) AS
+    BEGIN
+        SECURITY_PKG.clear_app_user;
+    
+        p_status  := 'OK';
+        p_message := 'Logout successful.';
+    EXCEPTION
+        WHEN OTHERS THEN
+            p_status  := 'ERROR';
+            p_message := 'Logout failed: ' || SQLERRM;
+    END SP_LOGOUT;
+
     -- ============================================================
     -- PROCEDURE: SP_CREATE_ORGANISATION
     -- ============================================================

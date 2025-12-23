@@ -38,6 +38,18 @@ CREATE OR REPLACE PACKAGE SECURITY_PKG AS
         p_status     OUT VARCHAR2,
         p_message    OUT VARCHAR2
     );
+    
+    PROCEDURE SP_LOGOUT (
+        p_status  OUT VARCHAR2,
+        p_message OUT VARCHAR2
+    );
+    
+    PROCEDURE set_app_user(
+        p_user_id IN Utilisateur.id_user%TYPE,
+        p_email   IN VARCHAR2
+    );
+    
+    PROCEDURE clear_app_user;
 
     -- =========================
     -- ORGANISATION & ACTIONS
