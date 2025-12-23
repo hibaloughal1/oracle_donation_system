@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+cx_Oracle
+python-jose
+pydantic
+python-dotenv
