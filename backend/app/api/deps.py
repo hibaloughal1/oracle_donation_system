@@ -1,17 +1,40 @@
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt
-from app.core.config import settings
+from jose import JWTError, jwt
+import oracledb
+from app.core.config import settings  # Assure-toi que config.py existe avec settings
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+# Création du pool de connexions Oracle
+pool = oracledb.create_pool(
+    user=settings.DB_USERNAME,
+    password=settings.DB_PASSWORD,
+    dsn=settings.DB_DSN,
+    min=2,
+    max=10,
+    increment=1
+)
+
+def get_db():
+    conn = pool.acquire()
     try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=["HS256"]
-        )
-        return payload
-    except:
-        raise HTTPException(401, "Invalid token")
+        yield conn
+    finally:
+        pool.release(conn)
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token invalide ou expiré",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: int = payload.get("sub")
+        role: str = payload.get("role", "USER")
+        if user_id is None:
+            raise credentials_exception
+        return {"user_id": user_id, "role": role}
+    except JWTError:
+        raise credentials_exception

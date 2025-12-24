@@ -1,32 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
-from app.schemas.organisation import OrganisationCreate
+from fastapi import APIRouter, Depends
+from app.api.deps import get_db
 from app.core.database import get_connection
-from app.api.deps import get_current_user
 
-router = APIRouter(prefix="/organisations", tags=["Organisations"])
+router = APIRouter()
 
-@router.post("/")
-def create_organisation(data: OrganisationCreate, user=Depends(get_current_user)):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    p_id_org = cur.var(int)
-    p_status = cur.var(str)
-    p_message = cur.var(str)
-
-    cur.callproc("SECURITY_PKG.SP_CREATE_ORGANISATION", [
-        user["user_id"],
-        data.nom,
-        data.description,
-        data.tel,
-        data.patente,
-        data.lieu,
-        p_id_org,
-        p_status,
-        p_message
-    ])
-
-    if p_status.getvalue() != "OK":
-        raise HTTPException(400, p_message.getvalue())
-
-    return {"id_org": p_id_org.getvalue()}
+@router.get("/")
+def get_organisations(db = Depends(get_db)):
+    cursor = db.cursor()
+    try:
+        cursor.execute("SELECT id, name, description FROM organisation WHERE status = 'ACTIVE'")
+        columns = [col[0].lower() for col in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    finally:
+        cursor.close()

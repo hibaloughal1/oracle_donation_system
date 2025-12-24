@@ -1,38 +1,43 @@
-from fastapi import APIRouter, HTTPException
-from app.core.database import get_connection
-from app.core.security import create_access_token
-from app.schemas.auth import LoginRequest
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
+from jose import jwt
+from app.api.deps import get_db
+from app.core.config import settings
+import oracledb
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+router = APIRouter()
+
+@router.post("/register")
+def register(email: str, password: str, phone: str, db = Depends(get_db)):
+    cursor = db.cursor()
+    try:
+        user_id = cursor.var(oracledb.NUMBER)
+        cursor.callproc("SP_REGISTER_USER", [email, password, phone, user_id])
+        db.commit()
+        return {"message": "Inscription réussie", "user_id": int(user_id.getvalue())}
+    except oracledb.Error as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.post("/login")
-def login(data: LoginRequest):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    p_id_user = cur.var(int)
-    p_role = cur.var(str)
-    p_status = cur.var(str)
-    p_message = cur.var(str)
-
-    cur.callproc("SECURITY_PKG.SP_LOGIN", [
-        data.email,
-        data.password,
-        p_id_user,
-        p_role,
-        p_status,
-        p_message
-    ])
-
-    if p_status.getvalue() != "OK":
-        raise HTTPException(401, p_message.getvalue())
-
-    token = create_access_token({
-        "user_id": p_id_user.getvalue(),
-        "role": p_role.getvalue()
-    })
-
-    return {
-        "token": token,
-        "role": p_role.getvalue()
-    }
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
+    cursor = db.cursor()
+    try:
+        status = cursor.var(oracledb.STRING)
+        role = cursor.var(oracledb.STRING)
+        user_id = cursor.var(oracledb.NUMBER)
+        cursor.callproc("SP_LOGIN", [form_data.username, form_data.password, status, role, user_id])
+        if status.getvalue() != "SUCCESS":
+            raise HTTPException(status_code=401, detail="Identifiants incorrects")
+        token = jwt.encode(
+            {"sub": int(user_id.getvalue()), "role": role.getvalue()},
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM
+        )
+        return {"access_token": token, "token_type": "bearer", "role": role.getvalue()}
+    except oracledb.Error as e:
+        print(e)
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cursor.close()

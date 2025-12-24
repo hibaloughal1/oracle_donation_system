@@ -1,6 +1,9 @@
 fastapi
 uvicorn
-cx_Oracle
+oracledb  # Remplace cx_Oracle par ça cx_Oracle
 python-jose
 pydantic
 python-dotenv
+python-jose[cryptography]
+passlib[bcrypt]
+pydantic-settings

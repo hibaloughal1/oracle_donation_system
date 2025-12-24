@@ -1,33 +1,14 @@
-<<<<<<< HEAD
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.api import auth, organisations, actions, besoins, donations
+from app.api import api_router
 
-app = FastAPI(title="Donation Management API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   # Lovable
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app = FastAPI(
+    title="Oracle Donation System",
+    description="Système complet de gestion des dons avec Oracle PL/SQL",
+    version="1.0.0"
 )
 
-app.include_router(auth.router)
-app.include_router(organisations.router)
-app.include_router(actions.router)
-app.include_router(besoins.router)
-app.include_router(donations.router)
-=======
-from fastapi import FastAPI
-from app.core.config import settings
-from app.api.routes.health import router as health_router
-
-app = FastAPI(title=settings.APP_NAME)
+app.include_router(api_router)
 
 @app.get("/")
 def root():
-    return {"message": f"Welcome to {settings.APP_NAME}"}
-
-app.include_router(health_router, prefix="/api/health", tags=["health"])
->>>>>>> b5bcd160c0527b1a1e1ef0ae33d62e90e4cf7dba
+    return {"message": "API prête ! Accédez à /docs pour tester les endpoints."}

@@ -1,9 +1,9 @@
-import cx_Oracle
+import oracledb
 from app.core.config import settings
 
 def get_connection():
-    return cx_Oracle.connect(
-        user=settings.DB_USER,
+    return oracledb.connect(
+        user=settings.DB_USERNAME,
         password=settings.DB_PASSWORD,
         dsn=settings.DB_DSN,
         encoding="UTF-8"

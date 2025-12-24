@@ -1,14 +1,17 @@
+from fastapi import APIRouter, Depends, HTTPException
+from app.api.deps import get_db, get_current_user
+
+router = APIRouter()
+
 @router.post("/")
-def donate(data: DonationCreate, user=Depends(get_current_user)):
-    cur.callproc("SECURITY_PKG.SP_MAKE_DONATION", [
-        user["user_id"],
-        data.besoin_id,
-        data.montant,
-        data.preuve,
-        "PENDING",
-        p_id_don,
-        p_status,
-        p_message
-    ])
-
-
+def make_donation(besoin_id: int, amount: float, current_user = Depends(get_current_user), db = Depends(get_db)):
+    cursor = db.cursor()
+    try:
+        cursor.callproc("SP_MAKE_DONATION", [current_user["user_id"], besoin_id, amount])
+        db.commit()
+        return {"message": "Don enregistré avec succès ! Merci ❤️"}
+    except oracledb.Error as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cursor.close()
