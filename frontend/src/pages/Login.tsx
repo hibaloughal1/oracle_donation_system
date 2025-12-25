@@ -10,24 +10,29 @@ function Login() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
+  
+    const formData = new FormData()
+    formData.append('username', email)
+    formData.append('password', password)
+  
     try {
-      const res = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       })
-
-      const data = await res.json()
-
-      if (!res.ok) {
+  
+      const data = await response.json()
+  
+      if (!response.ok) {
         throw new Error(data.detail || 'Identifiants incorrects')
       }
-
+  
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('role', data.role || 'USER')
       navigate('/dashboard')
     } catch (err: any) {
-      setError(err.message || 'Erreur de connexion')
+      setError(err.message || 'Erreur lors de la connexion')
     }
   }
 

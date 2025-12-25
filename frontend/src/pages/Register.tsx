@@ -17,7 +17,9 @@ const Register = () => {
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',  // <--- AJOUTE ÇA OBLIGATOIREMENT
+        },
         body: JSON.stringify({ email, password, phone }),
       })
 
@@ -30,7 +32,18 @@ const Register = () => {
       setSuccess('Inscription réussie ! Redirection vers la connexion...')
       setTimeout(() => navigate('/'), 2000)
     } catch (err: any) {
-      setError(err.message || 'Erreur lors de l\'inscription')
+      if (err.response?.data?.detail) {
+        if (typeof err.response.data.detail === 'string') {
+          setError(err.response.data.detail);
+        } else if (Array.isArray(err.response.data.detail)) {
+          // FastAPI renvoie parfois une liste d'erreurs
+          setError(err.response.data.detail.map((e: any) => e.msg).join(', ') || 'Erreur de validation');
+        } else {
+          setError('Erreur lors de la connexion');
+        }
+      } else {
+        setError(err.message || 'Erreur réseau ou serveur');
+      }
     }
   }
 
